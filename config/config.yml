@@ -1,0 +1,44 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+clients:
+  - url: http://localhost:3001/loki/api/v1/push
+    tenant_id: "docker_kp"
+    batchwait: 2s
+    batchsize: 5000  # Kurangi batch size jika rate limit masih terjadi
+    backoff_config:
+      min_period: 500ms
+      max_period: 10s
+      max_retries: 10
+    # headers:
+    #   Content-Encoding: gzip  # Aktifkan kembali gzip compression
+
+positions:
+  filename: /tmp/positions.yaml
+
+#scrape_configs:
+#  - job_name: docker
+#    static_configs:
+#      - targets:
+#          - localhost
+#        labels:
+#          job: docker
+#          app: seatunnel
+#          __path__: /var/lib/docker/containers/*/*.log
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      # Ambil nama container sebagai label
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: /(.*)
+        replacement: $1
+      # Ambil ID container untuk unik
+      - source_labels: [__meta_docker_container_id]
+        target_label: container_id
+      # Ambil log path
+      - source_labels: [__meta_docker_container_log_path]
+        target_label: __path__
